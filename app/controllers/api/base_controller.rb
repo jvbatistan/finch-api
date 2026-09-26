@@ -3,12 +3,31 @@ class Api::BaseController < ActionController::Base
 
   include ActionController::Cookies
 
-  skip_before_action :verify_authenticity_token
+  protect_from_forgery with: :exception
   respond_to :json
+
+  rescue_from ActionController::InvalidAuthenticityToken, with: :render_invalid_csrf_token
+
+  before_action :reject_inactive_user!
 
   helper_method :current_data_environment, :real_data_environment?
 
   private
+
+  def reject_inactive_user!
+    return unless current_user && !current_user.active?
+
+    sign_out(:user)
+    render json: { error: "Unauthorized" }, status: :unauthorized
+  end
+
+  def render_invalid_csrf_token
+    render json: { error: "Token CSRF inválido ou ausente" }, status: :forbidden
+  end
+
+  def rotate_csrf_token!
+    session.delete(:_csrf_token)
+  end
 
   def current_data_environment
     DataEnvironments.current(request)

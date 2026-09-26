@@ -7,6 +7,7 @@ Rails.application.routes.draw do
     get "dashboard", to: "dashboard#show"
     get "health",    to: "health#show"
     get "me",        to: "me#show"
+    get "csrf",      to: "csrf#show"
     patch "me",      to: "me#update"
     post "register", to: "registrations#create"
     post "login",    to: "sessions#create"

@@ -2,7 +2,7 @@ class User < ApplicationRecord
   MAX_USERS = 2
 
   devise :database_authenticatable, :registerable,
-         :recoverable, :rememberable, :validatable
+         :recoverable, :validatable
 
   has_many :account_transfers, dependent: :destroy
   has_many :cards, dependent: :destroy

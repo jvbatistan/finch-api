@@ -4,6 +4,7 @@ class Api::SessionsController < Api::BaseController
 
     if user&.active? && user.valid_password?(params[:password])
       sign_in(user)
+      rotate_csrf_token!
       render json: { ok: true }
     else
       render json: { ok: false, error: "Credenciais inválidas" }, status: :unauthorized
