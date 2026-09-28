@@ -334,6 +334,7 @@ class Api::PaymentsController < Api::BaseController
     {
       id: transaction.id,
       description: transaction.description,
+      friendly_title: transaction.friendly_title,
       value: transaction.value,
       signed_value: transaction.signed_value,
       refund: transaction.refund,

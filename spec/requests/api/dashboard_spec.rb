@@ -44,13 +44,14 @@ RSpec.describe "Api::Dashboard", type: :request do
     it "limits recent expenses to the selected competence" do
       card = create(:card, user: user, due_day: 15, closing_day: 8)
       outside_period = create(:transaction, user: user, card: card, source: :card, date: Date.new(2026, 1, 10), billing_statement: Date.new(2026, 2, 1), created_at: Time.zone.parse("2026-08-20 10:00"), description: "Despesa fora da competência")
-      recent = create(:transaction, user: user, source: :cash, card: nil, date: Date.new(2026, 3, 10), created_at: Time.zone.parse("2026-08-19 10:00"), description: "Despesa da competência")
+      recent = create(:transaction, user: user, source: :cash, card: nil, date: Date.new(2026, 3, 10), created_at: Time.zone.parse("2026-08-19 10:00"), description: "Despesa da competência", friendly_title: "Título do dashboard")
 
       get "/api/dashboard", params: { month: 3, year: 2026 }
 
       body = JSON.parse(response.body)
       expect(body.fetch("period")).to include("month" => 3, "year" => 2026)
       expect(body.fetch("recent_expenses").first.fetch("id")).to eq(recent.id)
+      expect(body.fetch("recent_expenses").first.fetch("friendly_title")).to eq("Título do dashboard")
       expect(body.fetch("recent_expenses").map { |expense| expense.fetch("id") }).not_to include(outside_period.id)
     end
 

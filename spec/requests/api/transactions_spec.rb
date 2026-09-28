@@ -34,6 +34,31 @@ RSpec.describe 'Api::Transactions', type: :request do
   end
 
   describe 'POST /api/transactions' do
+    it 'persists and returns an optional friendly title without changing the original description' do
+      account = create(:account, user: user, initial_balance: 95)
+
+      post '/api/transactions', params: {
+        transaction: {
+          description: 'PAG*MAQUININHA 1234',
+          friendly_title: 'Presente da Maria',
+          value: '22,00',
+          date: '2026-08-22',
+          kind: 'expense',
+          source: 'cash',
+          account_id: account.id
+        }
+      }
+
+      expect(response).to have_http_status(:created)
+
+      body = JSON.parse(response.body)
+      transaction = Transaction.find(body['id'])
+      expect(transaction.description).to eq('PAG*MAQUININHA 1234')
+      expect(transaction.friendly_title).to eq('Presente da Maria')
+      expect(body['description']).to eq('PAG*MAQUININHA 1234')
+      expect(body['friendly_title']).to eq('Presente da Maria')
+    end
+
     it 'rejects cash and bank expenses with a card without creating a transaction' do
       card = create(:card, user: user)
 
@@ -919,6 +944,19 @@ RSpec.describe 'Api::Transactions', type: :request do
   end
 
   describe 'PATCH /api/transactions/:id' do
+    it 'updates the friendly title independently from the original description' do
+      transaction = create(:transaction, user: user, card: nil, source: :cash, description: 'PAG*MAQUININHA 1234')
+
+      patch "/api/transactions/#{transaction.id}", params: {
+        transaction: { friendly_title: 'Presente da Maria' }
+      }
+
+      expect(response).to have_http_status(:ok)
+      expect(transaction.reload.description).to eq('PAG*MAQUININHA 1234')
+      expect(transaction.friendly_title).to eq('Presente da Maria')
+      expect(JSON.parse(response.body)['friendly_title']).to eq('Presente da Maria')
+    end
+
     it 'updates the selected transaction through the API' do
       card = create(:card, user: user, name: 'Nubank', due_day: 15, closing_day: 8)
       transaction = create(:transaction, user: user, card: nil, source: :cash, date: Date.new(2026, 3, 10), value: 80, description: 'Uber')

@@ -177,11 +177,11 @@ module Accounts
     end
 
     def limited_income_entries
-      income_scope.includes(:category).order(date: :desc, created_at: :desc, id: :desc).limit(candidate_limit).map { |tx| transaction_entry(tx, movement_type: 'income', direction: 'credit', title: tx.description) }
+      income_scope.includes(:category).order(date: :desc, created_at: :desc, id: :desc).limit(candidate_limit).map { |tx| transaction_entry(tx, movement_type: 'income', direction: 'credit', title: transaction_title(tx)) }
     end
 
     def limited_cash_expense_entries
-      cash_expense_scope.includes(:category).order(Arel.sql('COALESCE(transactions.settled_on, transactions.date) DESC, transactions.created_at DESC, transactions.id DESC')).limit(candidate_limit).map { |tx| transaction_entry(tx, movement_type: 'expense', direction: 'debit', title: tx.description) }
+      cash_expense_scope.includes(:category).order(Arel.sql('COALESCE(transactions.settled_on, transactions.date) DESC, transactions.created_at DESC, transactions.id DESC')).limit(candidate_limit).map { |tx| transaction_entry(tx, movement_type: 'expense', direction: 'debit', title: transaction_title(tx)) }
     end
 
     def limited_transaction_payment_entries
@@ -271,7 +271,7 @@ module Accounts
       StatementEntry.new(
         id: "transaction-payment-#{payment.id}", source_type: "transaction_payment", source_id: payment.id,
         movement_type: "expense", direction: "debit", amount: payment.amount, occurred_on: payment.settled_on,
-        title: "Pagamento — #{transaction.description}", description: transaction.note, created_at: payment.created_at,
+        title: "Pagamento — #{transaction_title(transaction)}", description: transaction.note, created_at: payment.created_at,
         metadata: { transaction_id: transaction.id, category: category_metadata(transaction.category), source: transaction.source, responsible: transaction.responsible }
       )
     end
@@ -294,6 +294,10 @@ module Accounts
           responsible: transaction.responsible
         }
       )
+    end
+
+    def transaction_title(transaction)
+      transaction.friendly_title.presence || transaction.description
     end
 
     def transaction_settlement_amount(transaction, movement_type)

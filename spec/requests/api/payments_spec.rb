@@ -48,7 +48,7 @@ RSpec.describe "Api::Payments", type: :request do
       card = create(:card, user: user, name: 'Nubank', due_day: 15, closing_day: 8)
       create(:transaction, user: user, card: card, source: :card, date: Date.new(2026, 3, 7), value: 120)
       create(:transaction, user: user, card: card, source: :card, date: Date.new(2026, 3, 7), value: 20, refund: true, description: "Estorno Uber")
-      create(:transaction, user: user, card: nil, source: :cash, date: Date.new(2026, 3, 10), value: 80)
+      create(:transaction, user: user, card: nil, source: :cash, date: Date.new(2026, 3, 10), value: 80, friendly_title: "Mercado da semana")
       create(:transaction, user: user, card: nil, source: :cash, date: Date.new(2026, 4, 10), value: 50)
 
       get "/api/payments", params: { month: 3, year: 2026 }
@@ -66,6 +66,7 @@ RSpec.describe "Api::Payments", type: :request do
       expect(card.card_statements).to be_empty
       expect(body["loose_expenses"]["transactions_count"]).to eq(1)
       expect(body["loose_expenses"]["total_amount"]).to eq("80.0")
+      expect(body["loose_expenses"]["transactions"].first["friendly_title"]).to eq("Mercado da semana")
       expect(body["ignored_payments"]["statements_count"]).to eq(0)
       expect(body["ignored_payments"]["loose_expenses"]["transactions_count"]).to eq(0)
     end
