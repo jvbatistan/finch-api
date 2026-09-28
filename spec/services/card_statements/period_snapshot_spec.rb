@@ -3,16 +3,18 @@ require "rails_helper"
 RSpec.describe CardStatements::PeriodSnapshot do
   let(:user) { create(:user) }
 
-  it "creates a missing statement and derives its totals and transaction count" do
+  it "projects a missing statement without persisting it and derives its totals and transaction count" do
     card = create(:card, user: user, due_day: 15, closing_day: 8)
     create(:transaction, user: user, card: card, source: :card, date: Date.new(2026, 3, 7), value: 120)
     create(:transaction, user: user, card: card, source: :card, date: Date.new(2026, 3, 7), value: 20, refund: true)
 
     expect do
       @result = described_class.new(user: user, month: 3, year: 2026).call
-    end.to change(CardStatement, :count).by(1)
+    end.not_to change(CardStatement, :count)
 
     statement = @result.statements.first
+    expect(statement).not_to be_persisted
+    expect(statement.id).to be_nil
     expect(statement.billing_statement).to eq(Date.new(2026, 3, 15))
     expect(statement.total_amount.to_d).to eq(100.to_d)
     expect(statement.paid_amount.to_d).to eq(0.to_d)

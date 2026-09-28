@@ -54,17 +54,47 @@ class Api::PaymentsController < Api::BaseController
 
   def pay_card_statement
     statement = current_user_card_statements.active_for_payments.find(params[:id])
-    amount = payment_amount_param(statement.remaining_amount)
-    account = payment_account_param
-
-    statement.apply_payment!(amount, account: account)
-    statement.card.sync_statement!(statement.billing_statement.month, statement.billing_statement.year)
-
-    render json: payment_statement_json(statement.reload), status: :ok
+    pay_statement(statement)
   rescue ArgumentError => e
     render json: { error: e.message }, status: :unprocessable_entity
   rescue ActiveRecord::RecordInvalid => e
     render json: { error: e.record.errors.full_messages.to_sentence }, status: :unprocessable_entity
+  end
+
+  def pay_card_statement_by_reference
+    pay_statement(materialize_statement_from_reference!)
+  rescue ArgumentError => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { error: e.record.errors.full_messages.to_sentence }, status: :unprocessable_entity
+  end
+
+  def ignore_card_statement
+    statement = current_user_card_statements.active_for_payments.where(billing_statement: period_start..period_end).find(params[:id])
+    ignore_statement(statement)
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { error: e.record.errors.full_messages.to_sentence }, status: :unprocessable_entity
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: "Fatura não encontrada para o período selecionado." }, status: :not_found
+  end
+
+  def ignore_card_statement_by_reference
+    ignore_statement(materialize_statement_from_reference!)
+  rescue ArgumentError => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { error: e.record.errors.full_messages.to_sentence }, status: :unprocessable_entity
+  end
+
+  def pay_statement(statement)
+    statement.card.sync_statement!(statement.billing_statement.month, statement.billing_statement.year)
+    statement.reload
+    amount = payment_amount_param(statement.remaining_amount)
+    account = payment_account_param
+
+    statement.apply_payment!(amount, account: account)
+
+    render json: payment_statement_json(statement.reload), status: :ok
   end
 
   def pay_loose_expenses
@@ -98,15 +128,10 @@ class Api::PaymentsController < Api::BaseController
     render json: { error: e.record.errors.full_messages.to_sentence }, status: :unprocessable_entity
   end
 
-  def ignore_card_statement
-    statement = current_user_card_statements.active_for_payments.where(billing_statement: period_start..period_end).find(params[:id])
+  def ignore_statement(statement)
     statement.ignore_for_payment!
 
     render json: payment_statement_json(statement.reload), status: :ok
-  rescue ActiveRecord::RecordInvalid => e
-    render json: { error: e.record.errors.full_messages.to_sentence }, status: :unprocessable_entity
-  rescue ActiveRecord::RecordNotFound
-    render json: { error: "Fatura não encontrada para o período selecionado." }, status: :not_found
   end
 
   def pay_loose_expense
@@ -184,6 +209,22 @@ class Api::PaymentsController < Api::BaseController
 
   def current_user_card_statements
     CardStatement.joins(:card).where(cards: { user_id: current_user.id })
+  end
+
+  def materialize_statement_from_reference!
+    card_id = params[:card_id].presence || params.dig(:statement, :card_id).presence
+    billing_statement = params[:billing_statement].presence || params.dig(:statement, :billing_statement).presence
+    raise ArgumentError, "Cartão é obrigatório para a fatura." if card_id.blank?
+    raise ArgumentError, "Competência da fatura é obrigatória." if billing_statement.blank?
+
+    card = current_user.cards.find(card_id)
+    date = Date.iso8601(billing_statement)
+    expected = card.due_on(date.year, date.month)
+    raise ArgumentError, "Competência da fatura inválida." unless date == expected
+
+    card.sync_statement!(date.month, date.year)
+  rescue Date::Error
+    raise ArgumentError, "Competência da fatura inválida."
   end
 
 

@@ -46,7 +46,9 @@ Rails.application.routes.draw do
     resources :cards, only: [:index, :create, :update, :destroy]
 
     get  "payments", to: "payments#index"
+    post "payments/card_statements/pay", to: "payments#pay_card_statement_by_reference"
     post "payments/card_statements/:id/pay", to: "payments#pay_card_statement"
+    post "payments/card_statements/ignore", to: "payments#ignore_card_statement_by_reference"
     post "payments/card_statements/:id/ignore", to: "payments#ignore_card_statement"
     post "payments/loose_expenses/:id/pay", to: "payments#pay_loose_expense"
     post "payments/loose_expenses/:id/ignore", to: "payments#ignore_loose_expense"

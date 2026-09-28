@@ -62,10 +62,30 @@ RSpec.describe "Api::Payments", type: :request do
       expect(body["statements"].first["total_amount"]).to eq("100.0")
       expect(body["statements"].first["remaining_amount"]).to eq("100.0")
       expect(body["statements"].first["ignored_at"]).to eq(nil)
+      expect(body["statements"].first["id"]).to be_nil
+      expect(card.card_statements).to be_empty
       expect(body["loose_expenses"]["transactions_count"]).to eq(1)
       expect(body["loose_expenses"]["total_amount"]).to eq("80.0")
       expect(body["ignored_payments"]["statements_count"]).to eq(0)
       expect(body["ignored_payments"]["loose_expenses"]["transactions_count"]).to eq(0)
+    end
+
+    it "materializes a virtual statement only when a payment is explicitly requested" do
+      card = create(:card, user: user, name: "Nubank", due_day: 15, closing_day: 8)
+      account = create(:account, user: user, initial_balance: 200)
+      create(:transaction, user: user, card: card, source: :card, date: Date.new(2026, 3, 7), value: 120)
+
+      expect do
+        post "/api/payments/card_statements/pay", params: {
+          card_id: card.id,
+          billing_statement: "2026-03-15",
+          account_id: account.id,
+          amount: 120
+        }
+      end.to change(CardStatement, :count).by(1)
+
+      expect(response).to have_http_status(:ok)
+      expect(JSON.parse(response.body)).to include("paid" => true, "remaining_amount" => "0.0")
     end
 
     it "adds regular card expenses and subtracts card refunds in the statement total" do
