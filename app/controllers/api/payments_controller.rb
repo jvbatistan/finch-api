@@ -92,7 +92,7 @@ class Api::PaymentsController < Api::BaseController
     amount = payment_amount_param(statement.remaining_amount)
     account = payment_account_param
 
-    statement.apply_payment!(amount, account: account)
+    statement.apply_payment!(amount, account: account, paid_at: statement_payment_time_param)
 
     render json: payment_statement_json(statement.reload), status: :ok
   end
@@ -248,6 +248,17 @@ class Api::PaymentsController < Api::BaseController
     raise ArgumentError, message if account_id.blank?
 
     current_user.accounts.active.find_by(id: account_id) || raise(ArgumentError, "Conta não encontrada.")
+  end
+
+  def statement_payment_time_param
+    value = params[:paid_at].presence || params.dig(:payment, :paid_at).presence
+    return Time.zone.now if value.blank?
+
+    raise ArgumentError if Date._iso8601(value)[:offset].nil?
+
+    Time.iso8601(value)
+  rescue ArgumentError
+    raise ArgumentError, 'Data e hora do pagamento inválida.'
   end
 
   def settlement_date_param

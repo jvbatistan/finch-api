@@ -294,6 +294,36 @@ RSpec.describe "Api::Payments", type: :request do
       expect(body["payment_status"]).to eq("partially_paid")
     end
 
+    it "records the supplied payment instant" do
+      card = create(:card, user: user, name: 'Nubank', due_day: 15, closing_day: 8)
+      account = create(:account, user: user, initial_balance: 200)
+      create(:transaction, user: user, card: card, source: :card, date: Date.new(2026, 3, 7), value: 120, paid: false)
+      statement = card.sync_statement!(3, 2026)
+      paid_at = '2026-03-10T14:30:00-03:00'
+
+      post "/api/payments/card_statements/#{statement.id}/pay", params: { amount: 120, account_id: account.id, paid_at: paid_at }
+
+      expect(response).to have_http_status(:ok)
+      expect(statement.card_statement_payments.last.paid_at).to eq(Time.iso8601(paid_at))
+      expect(statement.reload.paid_at).to eq(Time.iso8601(paid_at))
+    end
+
+    it "rejects an invalid or timezone-less supplied payment instant without creating a payment" do
+      card = create(:card, user: user, name: 'Nubank', due_day: 15, closing_day: 8)
+      account = create(:account, user: user, initial_balance: 200)
+      create(:transaction, user: user, card: card, source: :card, date: Date.new(2026, 3, 7), value: 120, paid: false)
+      statement = card.sync_statement!(3, 2026)
+
+      ['not-a-date', '2026-03-10T14:30:00'].each do |paid_at|
+        expect do
+          post "/api/payments/card_statements/#{statement.id}/pay", params: { amount: 120, account_id: account.id, paid_at: paid_at }
+        end.not_to change(CardStatementPayment, :count)
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(JSON.parse(response.body).fetch('error')).to eq('Data e hora do pagamento inválida.')
+      end
+    end
+
     it 'rejects a statement payment that exceeds the selected account balance without mutating the statement' do
       card = create(:card, user: user, name: 'Nubank', due_day: 15, closing_day: 8)
       account = create(:account, user: user, initial_balance: 40)
