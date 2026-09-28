@@ -105,12 +105,14 @@ class Api::PaymentsController < Api::BaseController
 
     settled_on = settlement_date_param
 
-    Transaction.transaction do
-      scope.find_each do |transaction|
-        Transactions::RegisterPaymentService.new(
-          transaction: transaction, account: account, amount: transaction.value,
-          settled_on: settled_on, settle: true
-        ).call
+    Accounts::DebitGuard.call(account: account, amount: total) do
+      Transaction.transaction do
+        scope.find_each do |transaction|
+          Transactions::RegisterPaymentService.new(
+            transaction: transaction, account: account, amount: transaction.value,
+            settled_on: settled_on, settle: true
+          ).call
+        end
       end
     end
 

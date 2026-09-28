@@ -566,7 +566,9 @@ RSpec.describe "Api::Payments", type: :request do
       end.not_to change(TransactionPayment, :count)
 
       expect(response).to have_http_status(:unprocessable_entity)
-      expect(JSON.parse(response.body).fetch('error')).to include('Saldo insuficiente')
+      expect(JSON.parse(response.body).fetch('error')).to eq(
+        "Saldo insuficiente na conta #{account.name}. Disponível: R$ 1000,00. Necessário: R$ 1200,00."
+      )
       expect([first, second].map(&:reload).map(&:paid)).to eq([false, false])
       expect(Accounts::BalanceCalculator.call(account)).to eq(1_000.to_d)
       expect(Accounts::StatementBuilder.call(account: account, paginate: false).items.none? { |item| item.source_type == 'transaction_payment' }).to eq(true)
