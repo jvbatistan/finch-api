@@ -291,6 +291,18 @@ RSpec.describe Transaction, type: :model do
       expect(transaction).to be_valid
     end
 
+    it 'rejects a card on cash and bank expenses' do
+      user = create(:user)
+      card = create(:card, user: user)
+
+      %i[cash bank].each do |source|
+        transaction = build(:transaction, user: user, kind: :expense, source: source, card: card)
+
+        expect(transaction).not_to be_valid
+        expect(transaction.errors[:card]).to include('não deve existir para origem dinheiro ou banco')
+      end
+    end
+
     it 'allows new unpaid cash or bank expenses without an account' do
       cash = build(:transaction, kind: :expense, source: :cash, card: nil, account: nil)
       bank = build(:transaction, kind: :expense, source: :bank, card: nil, account: nil)

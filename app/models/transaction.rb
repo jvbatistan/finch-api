@@ -25,6 +25,7 @@ class Transaction < ApplicationRecord
   validate :installment_consistency
   validate :refund_consistency
   validate :income_consistency
+  validate :card_source_consistency
   validate :account_consistency
   validate :settlement_consistency
   validate :card_statement_payment_must_not_be_transaction
@@ -287,6 +288,12 @@ class Transaction < ApplicationRecord
     errors.add(:base, 'receita não pode ser parcelada') if installment_group_id.present? || installment_number.present? || installments_count.present?
     errors.add(:payment_ignored_at, 'não deve existir para receitas') if payment_ignored_at.present?
     errors.add(:refund, 'não pode ser verdadeiro para receitas') if refund?
+  end
+
+  def card_source_consistency
+    return unless expense? && (cash? || bank?) && card_id.present?
+
+    errors.add(:card, 'não deve existir para origem dinheiro ou banco')
   end
 
   def account_consistency

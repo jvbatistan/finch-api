@@ -34,6 +34,21 @@ RSpec.describe 'Api::Transactions', type: :request do
   end
 
   describe 'POST /api/transactions' do
+    it 'rejects cash and bank expenses with a card without creating a transaction' do
+      card = create(:card, user: user)
+
+      %w[cash bank].each do |source|
+        expect do
+          post '/api/transactions', params: {
+            transaction: { description: 'Despesa', value: '10,00', date: Date.current, kind: 'expense', source: source, card_id: card.id }
+          }
+        end.not_to change(Transaction, :count)
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(JSON.parse(response.body).fetch('error')).to include('Cartão não deve existir para origem dinheiro ou banco')
+      end
+    end
+
     it 'preserves a civil date through create, persistence, response, reload and edit' do
       account = create(:account, user: user, initial_balance: 95)
 
@@ -973,7 +988,23 @@ RSpec.describe 'Api::Transactions', type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(transaction.reload).to be_cash
+      expect(transaction.card_id).to be_nil
+      expect(transaction.billing_statement).to be_nil
       expect(transaction.account_id).to be_nil
+    end
+
+    it 'rejects changing a card expense to cash or bank while retaining its card' do
+      card = create(:card, user: user)
+      transaction = create(:transaction, user: user, card: card, source: :card)
+
+      %w[cash bank].each do |source|
+        patch "/api/transactions/#{transaction.id}", params: { transaction: { source: source } }
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(JSON.parse(response.body).fetch('error')).to include('Cartão não deve existir para origem dinheiro ou banco')
+        expect(transaction.reload).to be_card
+        expect(transaction.card_id).to eq(card.id)
+      end
     end
 
     it 'does not update a transaction with a category from another user' do
