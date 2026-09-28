@@ -45,7 +45,7 @@ RSpec.describe 'Api::Transactions', type: :request do
         end.not_to change(Transaction, :count)
 
         expect(response).to have_http_status(:unprocessable_entity)
-        expect(JSON.parse(response.body).fetch('error')).to include('Cartão não deve existir para origem dinheiro ou banco')
+        expect(JSON.parse(response.body).fetch('error')).to include('Card não deve existir para origem dinheiro ou banco')
       end
     end
 
@@ -1001,7 +1001,7 @@ RSpec.describe 'Api::Transactions', type: :request do
         patch "/api/transactions/#{transaction.id}", params: { transaction: { source: source } }
 
         expect(response).to have_http_status(:unprocessable_entity)
-        expect(JSON.parse(response.body).fetch('error')).to include('Cartão não deve existir para origem dinheiro ou banco')
+        expect(JSON.parse(response.body).fetch('error')).to include('Card não deve existir para origem dinheiro ou banco')
         expect(transaction.reload).to be_card
         expect(transaction.card_id).to eq(card.id)
       end
