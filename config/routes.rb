@@ -5,6 +5,7 @@ Rails.application.routes.draw do
 
   namespace :api do
     get "dashboard", to: "dashboard#show"
+    get "financial_hygiene", to: "financial_hygiene#show"
     get "health",    to: "health#show"
     get "me",        to: "me#show"
     get "csrf",      to: "csrf#show"
