@@ -122,7 +122,7 @@ RSpec.describe Accounts::StatementBuilder do
       )
       expect(result.items.first.movement_type).to eq('transfer_in')
       expect(result.items.find { |item| item.id == "transaction-#{income.id}" }.metadata[:category]).to include(id: category.id, name: 'Salário')
-      expect(result.items.find { |item| item.id == "transaction-#{cash_expense.id}" }.title).to eq('Compras da semana')
+      expect(result.items.find { |item| item.id == "transaction-#{cash_expense.id}" }.title).to eq('COMPRAS DA SEMANA')
       expect(result.items.find { |item| item.id == "card-statement-payment-#{payment.id}" }.metadata[:card]).to include(id: card.id, name: 'NUBANK')
       expect(result.items.find { |item| item.id == "account-transfer-#{outgoing.id}-out" }.metadata[:counterparty_account]).to include(id: savings.id, name: 'Reserva')
     end

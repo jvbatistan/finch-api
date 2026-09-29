@@ -34,7 +34,7 @@ RSpec.describe 'Api::Transactions', type: :request do
   end
 
   describe 'POST /api/transactions' do
-    it 'persists and returns an optional friendly title without changing the original description' do
+    it 'persists and returns an uppercase friendly title without changing the original description' do
       account = create(:account, user: user, initial_balance: 95)
 
       post '/api/transactions', params: {
@@ -54,9 +54,9 @@ RSpec.describe 'Api::Transactions', type: :request do
       body = JSON.parse(response.body)
       transaction = Transaction.find(body['id'])
       expect(transaction.description).to eq('PAG*MAQUININHA 1234')
-      expect(transaction.friendly_title).to eq('Presente da Maria')
+      expect(transaction.friendly_title).to eq('PRESENTE DA MARIA')
       expect(body['description']).to eq('PAG*MAQUININHA 1234')
-      expect(body['friendly_title']).to eq('Presente da Maria')
+      expect(body['friendly_title']).to eq('PRESENTE DA MARIA')
     end
 
     it 'rejects cash and bank expenses with a card without creating a transaction' do
@@ -944,7 +944,7 @@ RSpec.describe 'Api::Transactions', type: :request do
   end
 
   describe 'PATCH /api/transactions/:id' do
-    it 'updates the friendly title independently from the original description' do
+    it 'updates the friendly title in uppercase independently from the original description' do
       transaction = create(:transaction, user: user, card: nil, source: :cash, description: 'PAG*MAQUININHA 1234')
 
       patch "/api/transactions/#{transaction.id}", params: {
@@ -953,8 +953,8 @@ RSpec.describe 'Api::Transactions', type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(transaction.reload.description).to eq('PAG*MAQUININHA 1234')
-      expect(transaction.friendly_title).to eq('Presente da Maria')
-      expect(JSON.parse(response.body)['friendly_title']).to eq('Presente da Maria')
+      expect(transaction.friendly_title).to eq('PRESENTE DA MARIA')
+      expect(JSON.parse(response.body)['friendly_title']).to eq('PRESENTE DA MARIA')
     end
 
     it 'updates the selected transaction through the API' do

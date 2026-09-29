@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${FINCH_E2E_DEVEL_DB:-}" != "1" || "${RAILS_ENV:-}" != "development" ]]; then
+  echo 'E2E server requires FINCH_E2E_DEVEL_DB=1 and RAILS_ENV=development' >&2
+  exit 1
+fi
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+cd "$script_dir/../.."
+
+env -u DATABASE_URL ruby -r "$script_dir/development_target" -e 'E2EDevelopmentTarget.run_cli!'
+
+exec env -u DATABASE_URL RUBYOPT="-r${script_dir}/disable_dotenv.rb" bundle exec rails server --binding 127.0.0.1 --port 3001

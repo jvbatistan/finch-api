@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+cd "$script_dir/../.."
+exec env -u DATABASE_URL RUBYOPT="-r${script_dir}/disable_dotenv.rb" FINCH_E2E_DEVEL_LAUNCHER=1 bundle exec ruby -r "$script_dir/prepare_development_fixture.rb" \
+  -e 'E2EDevelopmentFixture.run_cli!(ARGV)' "$@"
