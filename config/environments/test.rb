@@ -28,8 +28,8 @@ Rails.application.configure do
   # Raise exceptions instead of rendering exception templates.
   config.action_dispatch.show_exceptions = false
 
-  # Disable request forgery protection in test environment.
-  config.action_controller.allow_forgery_protection = false
+  # E2E browser tests exercise the same CSRF handshake as production.
+  config.action_controller.allow_forgery_protection = ENV['FINCH_E2E_CSRF'] == '1'
 
   # Store uploaded files on the local file system in a temporary directory.
   config.active_storage.service = :test
