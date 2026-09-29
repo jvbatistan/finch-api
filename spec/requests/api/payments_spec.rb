@@ -66,7 +66,7 @@ RSpec.describe "Api::Payments", type: :request do
       expect(card.card_statements).to be_empty
       expect(body["loose_expenses"]["transactions_count"]).to eq(1)
       expect(body["loose_expenses"]["total_amount"]).to eq("80.0")
-      expect(body["loose_expenses"]["transactions"].first["friendly_title"]).to eq("Mercado da semana")
+      expect(body["loose_expenses"]["transactions"].first["friendly_title"]).to eq("MERCADO DA SEMANA")
       expect(body["ignored_payments"]["statements_count"]).to eq(0)
       expect(body["ignored_payments"]["loose_expenses"]["transactions_count"]).to eq(0)
     end

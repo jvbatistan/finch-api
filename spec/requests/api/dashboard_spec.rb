@@ -51,7 +51,7 @@ RSpec.describe "Api::Dashboard", type: :request do
       body = JSON.parse(response.body)
       expect(body.fetch("period")).to include("month" => 3, "year" => 2026)
       expect(body.fetch("recent_expenses").first.fetch("id")).to eq(recent.id)
-      expect(body.fetch("recent_expenses").first.fetch("friendly_title")).to eq("Título do dashboard")
+      expect(body.fetch("recent_expenses").first.fetch("friendly_title")).to eq("TÍTULO DO DASHBOARD")
       expect(body.fetch("recent_expenses").map { |expense| expense.fetch("id") }).not_to include(outside_period.id)
     end
 

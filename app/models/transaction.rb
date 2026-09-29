@@ -213,6 +213,7 @@ class Transaction < ApplicationRecord
 
   def normalize_strings
     self.description = description.to_s.upcase.strip
+    self.friendly_title = friendly_title.upcase.strip if friendly_title
     self.responsible = responsible.to_s.upcase.strip
   end
 
