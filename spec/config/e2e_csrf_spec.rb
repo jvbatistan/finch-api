@@ -1,5 +1,6 @@
 require 'spec_helper'
 require 'ostruct'
+require 'logger'
 require 'active_support/core_ext/numeric/time'
 
 RSpec.describe 'E2E CSRF test setting' do
@@ -14,7 +15,7 @@ RSpec.describe 'E2E CSRF test setting' do
       settings.define_singleton_method(:config) { settings }
       app = double('Rails application')
       allow(app).to receive(:configure) { |&block| settings.instance_eval(&block) }
-      stub_const('Rails', double(application: app))
+      stub_const('Rails', double(application: app, logger: Logger.new(File::NULL)))
       allow(ENV).to receive(:[]).and_call_original
       allow(ENV).to receive(:[]).with('FINCH_E2E_CSRF').and_return(flag)
 

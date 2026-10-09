@@ -6,9 +6,20 @@ if [[ "${FINCH_E2E_DEVEL_DB:-}" != "1" || "${RAILS_ENV:-}" != "development" ]]; 
   exit 1
 fi
 
+api_port="${FINCH_E2E_API_PORT-3001}"
+if [[ "$api_port" != "3001" && "$api_port" != "3101" ]]; then
+  echo 'E2E server port must be 3001 or 3101' >&2
+  exit 1
+fi
+
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$script_dir/../.."
 
 env -u DATABASE_URL ruby -r "$script_dir/development_target" -e 'E2EDevelopmentTarget.run_cli!'
 
-exec env -u DATABASE_URL RUBYOPT="-r${script_dir}/disable_dotenv.rb" bundle exec rails server --binding 127.0.0.1 --port 3001
+server_args=(--binding 127.0.0.1 --port "$api_port")
+if [[ "$api_port" == "3101" ]]; then
+  server_args+=(--pid tmp/pids/finch-e2e-3101.pid)
+fi
+
+exec env -u DATABASE_URL RUBYOPT="-r${script_dir}/disable_dotenv.rb" bundle exec rails server "${server_args[@]}"

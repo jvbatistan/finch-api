@@ -11,11 +11,38 @@ RSpec.describe 'E2E development server launcher' do
     expect(source).to include('exit 1')
   end
 
-  it 'unsets the production URL before Rails and binds only to an explicit loopback port' do
+  it 'unsets the production URL before Rails and binds only to loopback' do
     expect(source).to include('exec env -u DATABASE_URL RUBYOPT=')
     expect(source).to include('disable_dotenv.rb')
-    expect(source).to include('--binding 127.0.0.1 --port 3001')
+    expect(source).to include('server_args=(--binding 127.0.0.1 --port "$api_port")')
     expect(source).not_to match(/\$\{?DATABASE_URL\b/)
+  end
+
+  it 'uses 3001 by default and accepts only the 3101 override' do
+    Dir.mktmpdir('finch-e2e-server-') do |directory|
+      bundle_shim = File.join(directory, 'bundle')
+      File.write(bundle_shim, "#!/bin/sh\nprintf '%s\\n' \"\$@\"\n")
+      File.chmod(0o755, bundle_shim)
+      launcher = File.expand_path('../../script/e2e/server_development', __dir__)
+      base_environment = {
+        'FINCH_E2E_DEVEL_DB' => '1', 'RAILS_ENV' => 'development',
+        'DATABASE_URL_DEVEL' => 'postgresql://fixture:password@localhost:5432/finch_api_development',
+        'PATH' => "#{directory}:#{ENV.fetch('PATH')}"
+      }
+
+      { nil => %w[3001], '3101' => %w[3101 --pid tmp/pids/finch-e2e-3101.pid] }.each do |override, expected_tail|
+        stdout, stderr, status = Open3.capture3(base_environment.merge('FINCH_E2E_API_PORT' => override), launcher)
+        expect(status.success?).to be(true), stderr
+        expect(stdout.lines.map(&:chomp)).to eq(%w[exec rails server --binding 127.0.0.1 --port] + expected_tail)
+      end
+
+      ['', '0', '3002', '3101junk', '127.0.0.1:3101'].each do |invalid_port|
+        stdout, stderr, status = Open3.capture3(base_environment.merge('FINCH_E2E_API_PORT' => invalid_port), launcher)
+        expect(status.success?).to be(false)
+        expect(stderr).to include('E2E server port must be 3001 or 3101')
+        expect(stdout).not_to include('rails')
+      end
+    end
   end
 
   it 'rejects wrong host, port, or database before launching Rails' do

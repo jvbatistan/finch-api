@@ -4,6 +4,7 @@
 require 'uri'
 require 'bigdecimal'
 require 'date'
+require_relative '../../app/services/data_environments'
 require_relative '../../app/services/data_environments/authorization'
 require_relative '../../lib/test_database_safety'
 require_relative 'development_target'
@@ -14,13 +15,14 @@ module E2EDevelopmentFixture
   EMAIL_VARIABLES = %w[FINCH_E2E_EMAIL_A FINCH_E2E_EMAIL_B].freeze
   PASSWORD_VARIABLES = %w[FINCH_E2E_PASSWORD_A FINCH_E2E_PASSWORD_B].freeze
   UNEXPECTED_USER_ASSOCIATIONS = %i[
-    cards categories account_transfers merchant_aliases
+    categories account_transfers merchant_aliases
   ].freeze
   ACCOUNT_KINDS = %w[checking savings wallet digital_wallet other].freeze
   TRANSACTION_KINDS = %w[income expense].freeze
   TRANSACTION_SOURCES = %w[cash bank].freeze
   INITIAL_BALANCE = BigDecimal('1000.00')
   INITIAL_BALANCE_DATE = Date.new(2020, 1, 1)
+  CARD_NAME = 'Finch E2E Card A'.freeze
 
   module_function
 
@@ -71,6 +73,19 @@ module E2EDevelopmentFixture
       end
     end
 
+    cards = users.flat_map { |user| user.cards.to_a }
+    card = cards.first
+    if cards.length > 1 || (card && (card.user_id != users.first.id || card.name != CARD_NAME.upcase))
+      raise UnsafeFixtureError, 'Unexpected E2E card resource.'
+    end
+    card_ids = cards.map(&:id)
+    statements = cards.flat_map { |owned_card| owned_card.card_statements.to_a }
+    if statements.length > 1 || statements.any? { |statement| statement.card_id != card.id } ||
+       (!card_ids.empty? && CardStatement.where(card_id: card_ids).where.not(id: statements.map(&:id)).exists?)
+      raise UnsafeFixtureError, 'Unexpected E2E card statement.'
+    end
+    statement_ids = statements.map(&:id)
+
     accounts = users.flat_map { |user| user.accounts.to_a }
     transactions = users.flat_map { |user| user.transactions.to_a }
     account_ids = accounts.map(&:id)
@@ -79,19 +94,53 @@ module E2EDevelopmentFixture
     transaction_owners = transactions.to_h { |transaction| [transaction.id, transaction.user_id] }
     accounts.each do |account|
       if !ids.include?(account.user_id) || !ACCOUNT_KINDS.include?(account.kind) ||
-         account.card_statement_payments.exists? ||
          account.outgoing_transfers.exists? || account.incoming_transfers.exists?
         raise UnsafeFixtureError, 'Unexpected E2E account resource.'
       end
     end
+    card_transactions = transactions.select { |transaction| transaction.card_id }
+    if card_transactions.length > 1 ||
+       (!card_ids.empty? && Transaction.where(card_id: card_ids).where.not(id: transaction_ids).exists?)
+      raise UnsafeFixtureError, 'Unexpected E2E card transaction.'
+    end
     transactions.each do |transaction|
       if !ids.include?(transaction.user_id) || !TRANSACTION_KINDS.include?(transaction.kind) ||
-         !TRANSACTION_SOURCES.include?(transaction.source) ||
-         transaction.card_id || transaction.category_id ||
-         transaction.billing_statement || transaction.installment_group_id ||
+         !(TRANSACTION_SOURCES.include?(transaction.source) ||
+           (transaction.source == 'card' && transaction.kind == 'expense' &&
+            transaction.user_id == card&.user_id && transaction.card_id == card&.id &&
+            transaction.account_id.nil? && transaction.billing_statement)) ||
+         transaction.category_id || transaction.installment_group_id ||
+         (transaction.source != 'card' && (transaction.card_id || transaction.billing_statement)) ||
          (transaction.account_id && account_owners[transaction.account_id] != transaction.user_id)
         raise UnsafeFixtureError, 'Unexpected E2E transaction resource.'
       end
+    end
+
+    if statements.any? do |statement|
+         card_transactions.length != 1 ||
+           statement.billing_statement != card.due_on(card_transactions.first.billing_statement.year,
+                                                      card_transactions.first.billing_statement.month) ||
+           BigDecimal(statement.total_amount.to_s) != BigDecimal(card_transactions.first.value.to_s)
+       end
+      raise UnsafeFixtureError, 'Unexpected E2E card statement period.'
+    end
+
+    statement_payments = statements.flat_map { |statement| statement.card_statement_payments.to_a }
+    if statement_payments.length > 1 ||
+       statement_payments.any? do |payment|
+         payment.card_statement_id != statements.first.id ||
+           account_owners[payment.account_id] != card.user_id || payment.original_transaction_id ||
+           payment.source != 'manual' || BigDecimal(payment.amount.to_s) <= 0 ||
+           BigDecimal(payment.amount.to_s) > BigDecimal(statements.first.total_amount.to_s)
+       end ||
+       (!statement_ids.empty? && CardStatementPayment.where(card_statement_id: statement_ids)
+                                                   .where.not(id: statement_payments.map(&:id)).exists?) ||
+       (!account_ids.empty? && CardStatementPayment.where(account_id: account_ids)
+                                                 .where.not(card_statement_id: statement_ids).exists?)
+      raise UnsafeFixtureError, 'Unexpected E2E card statement payment.'
+    end
+    if statements.any? && BigDecimal(statements.first.paid_amount.to_s) != statement_payments.sum { |payment| BigDecimal(payment.amount.to_s) }
+      raise UnsafeFixtureError, 'Unexpected E2E card statement paid amount.'
     end
 
     owned_suggestions = users.flat_map { |user| user.classification_suggestions.to_a }
@@ -113,13 +162,17 @@ module E2EDevelopmentFixture
     end
 
     { suggestions: linked_suggestions.map(&:id), payments: payment_ids,
-      transactions: transaction_ids, accounts: account_ids, users: ids }
+      card_statement_payments: statement_payments.map(&:id), transactions: transaction_ids,
+      card_statements: statement_ids, cards: card_ids, accounts: account_ids, users: ids }
   end
 
   def delete_graph!(records)
     ClassificationSuggestion.where(id: records.fetch(:suggestions)).delete_all
     TransactionPayment.where(id: records.fetch(:payments)).delete_all
+    CardStatementPayment.where(id: records.fetch(:card_statement_payments)).delete_all
     Transaction.where(id: records.fetch(:transactions)).delete_all
+    CardStatement.where(id: records.fetch(:card_statements)).delete_all
+    Card.where(id: records.fetch(:cards)).delete_all
     Account.where(id: records.fetch(:accounts)).delete_all
     User.where(id: records.fetch(:users)).delete_all
   end
@@ -138,6 +191,7 @@ module E2EDevelopmentFixture
     Account.create!(user: users.first, name: 'Finch E2E Account A', kind: :checking,
                     initial_balance: INITIAL_BALANCE, initial_balance_date: INITIAL_BALANCE_DATE,
                     archived_at: nil)
+    Card.create!(user: users.first, name: CARD_NAME, due_day: 15, closing_day: 8, limit: 5000)
   end
 
   def prepare!(environment: ENV, mode: :prepare)
