@@ -1,3 +1,5 @@
+require_relative "../../lib/production_secret_validation"
+
 Rails.application.configure do
   # Settings specified here will take precedence over those in config/application.rb.
 
@@ -14,9 +16,10 @@ Rails.application.configure do
   config.consider_all_requests_local       = false
   config.action_controller.perform_caching = true
 
-  # Ensures that a master key has been made available in either ENV["RAILS_MASTER_KEY"]
-  # or in config/master.key. This key is used to decrypt credentials (and other encrypted files).
-  # config.require_master_key = true
+  # Rails accepts SECRET_KEY_BASE or credentials.secret_key_base. Requiring the
+  # master key alone would reject valid ENV-only deployments, so validate the
+  # signing secret Rails actually resolves before Devise initializes.
+  ProductionSecretValidation.validate!(environment: Rails.env, application: Rails.application)
 
   # Disable serving static files from the `/public` folder by default since
   # Apache or NGINX already handles this.

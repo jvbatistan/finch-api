@@ -87,7 +87,7 @@ namespace :classification do
           end
         rescue StandardError => e
           stats[:errors] += 1
-          puts "ERRO tx=#{tx.id}: #{e.class} #{e.message}"
+          puts "ERRO tx=#{tx.id}: #{e.class}"
         end
       end
     end
@@ -204,7 +204,7 @@ namespace :classification do
         processed_txs << tx.id if gid.blank?
       rescue StandardError => e
         stats[:errors] += 1
-        puts "ERRO suggestion=#{suggestion.id} tx=#{tx.id}: #{e.class} #{e.message}"
+        puts "ERRO suggestion=#{suggestion.id} tx=#{tx.id}: #{e.class}"
       end
     end
 
